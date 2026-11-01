@@ -2370,6 +2370,12 @@ impl Device {
         let (module, source) = match source {
             #[cfg(feature = "wgsl")]
             pipeline::ShaderModuleSource::Wgsl(code) => {
+                log::info!(
+                    "POWERVR_DEBUG create_shader_module WGSL: label={:?} wgsl_len={} wgsl_first200={:?}",
+                    desc.label.as_ref().map(|l| l.to_string()),
+                    code.len(),
+                    &code[..code.len().min(200)]
+                );
                 profiling::scope!("naga::front::wgsl::parse");
                 let capabilities =
                     features_to_naga_capabilities(self.features, self.downlevel.flags);

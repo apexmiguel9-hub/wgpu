@@ -672,16 +672,39 @@ impl super::Device {
         spv: &[u32],
         label: &crate::Label<'_>,
     ) -> Result<vk::ShaderModule, crate::DeviceError> {
+        log::info!(
+            "POWERVR_DEBUG create_shader_module_impl: spv_words={} spv_bytes={} label={:?}",
+            spv.len(),
+            spv.len() * 4,
+            label
+        );
+        // Log first 8 SPIR-V words (magic + version + generator + bounds) to identify the shader
+        if spv.len() >= 8 {
+            log::info!(
+                "POWERVR_DEBUG spv_header: {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
+                spv[0], spv[1], spv[2], spv[3], spv[4], spv[5], spv[6], spv[7]
+            );
+        }
+
         let vk_info = vk::ShaderModuleCreateInfo::default()
             .flags(vk::ShaderModuleCreateFlags::empty())
             .code(spv);
 
         let raw = unsafe {
             profiling::scope!("vkCreateShaderModule");
-            self.shared
+            match self.shared
                 .raw
                 .create_shader_module(&vk_info, None)
-                .map_err(map_err)?
+            {
+                Ok(r) => {
+                    log::info!("POWERVR_DEBUG vkCreateShaderModule: SUCCESS");
+                    r
+                }
+                Err(e) => {
+                    log::error!("POWERVR_DEBUG vkCreateShaderModule: FAILED {:?}", e);
+                    return Err(map_err(e));
+                }
+            }
         };
         fn map_err(err: vk::Result) -> crate::DeviceError {
             // We don't use VK_NV_glsl_shader
@@ -776,6 +799,17 @@ impl super::Device {
                 .map_err(|e| {
                     crate::PipelineError::PipelineConstants(stage_flags, format!("{e}"))
                 })?;
+
+                log::info!(
+                    "POWERVR_DEBUG compile_stage: stage={:?} entry_point={} naga_entries={} naga_global_vars={} runtime_checks.bounds_checks={} runtime_checks.force_loop_bounding={} zero_init_workgroup={}",
+                    naga_stage,
+                    stage.entry_point,
+                    module.entry_points.len(),
+                    module.global_variables.keys().len(),
+                    runtime_checks.bounds_checks,
+                    runtime_checks.force_loop_bounding,
+                    stage.zero_initialize_workgroup_memory
+                );
 
                 let spv = {
                     profiling::scope!("naga::spv::write_vec");
