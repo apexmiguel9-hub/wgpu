@@ -461,6 +461,11 @@ bitflags::bitflags!(
         /// As such, we need to make sure all calls to vkCmdFillBuffer are aligned to 16 bytes
         /// if they cover a range of 4096 bytes or more.
         const FORCE_FILL_BUFFER_WITH_SIZE_GREATER_4096_ALIGNED_OFFSET_16 = 0x4;
+        /// Imagination (PowerVR) proprietary drivers segfault in vkQueueSubmit when
+        /// VkTimelineSemaphoreSubmitInfo is chained with waitSemaphoreValueCount = 0,
+        /// because they read pWaitSemaphoreValues[i] for every wait semaphore without
+        /// checking the count. Always pad semaphore values to avoid this.
+        const POWERVR_TIMELINE_SEMAPHORE_PADDING = 0x8;
     }
 );
 
@@ -1479,11 +1484,15 @@ impl crate::Queue for Queue {
 
         let mut vk_info = vk::SubmitInfo::default().command_buffers(&vk_cmd_buffers);
         let mut vk_timeline_info = mem::MaybeUninit::uninit();
+        let powervr_workaround = self.device.workarounds.contains(
+            crate::vulkan::Workarounds::POWERVR_TIMELINE_SEMAPHORE_PADDING,
+        );
         vk_info = SemaphoreList::add_to_submit(
             &mut wait_semaphores,
             &mut signal_semaphores,
             vk_info,
             &mut vk_timeline_info,
+            powervr_workaround,
         );
 
         profiling::scope!("vkQueueSubmit");
