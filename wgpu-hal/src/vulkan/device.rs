@@ -2234,25 +2234,20 @@ impl crate::Device for super::Device {
             log::info!(
                 "POWERVR_DEBUG create_graphics_pipelines: stages={} vs_module={:?} fs_module={:?}",
                 stages.len(),
-                compiled_vs.as_ref().map(|c| vk::Handle::as_raw(&c.create_info.module)),
-                compiled_fs.as_ref().map(|c| vk::Handle::as_raw(&c.create_info.module))
+                compiled_vs.as_ref().map(|c| vk::Handle::as_raw(c.create_info.module)),
+                compiled_fs.as_ref().map(|c| vk::Handle::as_raw(c.create_info.module))
             );
             unsafe {
-                match self.shared
+                self.shared
                     .raw
                     .create_graphics_pipelines(pipeline_cache, &vk_infos, None)
-                {
-                    Ok(r) => {
-                        log::info!("POWERVR_DEBUG create_graphics_pipelines: SUCCESS");
-                        r
-                    }
-                    Err((_, e)) => {
+                    .map_err(|(_, e)| {
                         log::error!("POWERVR_DEBUG create_graphics_pipelines: FAILED {:?}", e);
-                        return Err(super::map_pipeline_err(e));
-                    }
-                }
-            }
+                        super::map_pipeline_err(e)
+                    })
+            }?
         };
+        log::info!("POWERVR_DEBUG create_graphics_pipelines: SUCCESS");
 
         let raw = raw_vec.pop().unwrap();
         if let Some(label) = desc.label {
