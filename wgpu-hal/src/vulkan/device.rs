@@ -672,11 +672,13 @@ impl super::Device {
         spv: &[u32],
         label: &crate::Label<'_>,
     ) -> Result<vk::ShaderModule, crate::DeviceError> {
+        let dump_spirv = true;
         log::info!(
-            "POWERVR_DEBUG create_shader_module_impl: spv_words={} spv_bytes={} label={:?}",
+            "POWERVR_DEBUG create_shader_module_impl: spv_words={} spv_bytes={} label={:?} dump={}",
             spv.len(),
             spv.len() * 4,
-            label
+            label,
+            dump_spirv
         );
         // Log first 8 SPIR-V words (magic + version + generator + bounds) to identify the shader
         if spv.len() >= 8 {
@@ -684,6 +686,20 @@ impl super::Device {
                 "POWERVR_DEBUG spv_header: {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x} {:08x}",
                 spv[0], spv[1], spv[2], spv[3], spv[4], spv[5], spv[6], spv[7]
             );
+        }
+        // Dump full SPIR-V in chunks for analysis if env var is set
+        if dump_spirv {
+            let label_str = label.map(|l| l.to_string()).unwrap_or_else(|| "none".to_string());
+            let safe_label = label_str.replace('/', "_").replace(' ', "_");
+            for chunk in spv.chunks(8) {
+                let words: Vec<String> = chunk.iter().map(|w| format!("{:08x}", w)).collect();
+                log::info!(
+                    "POWERVR_DEBUG spv_chunk label={} offset={} {}",
+                    safe_label,
+                    (spv.as_ptr() as usize - chunk.as_ptr() as usize) / 4,
+                    words.join(" ")
+                );
+            }
         }
 
         let vk_info = vk::ShaderModuleCreateInfo::default()
@@ -1966,6 +1982,12 @@ impl crate::Device for super::Device {
             super::PipelineCache,
         >,
     ) -> Result<super::RenderPipeline, crate::PipelineError> {
+        log::info!(
+            "POWERVR_DEBUG create_render_pipeline: start, color_targets={}, has_fragment={}, primitive.topology={:?}",
+            desc.color_targets.len(),
+            desc.fragment_stage.is_some(),
+            desc.primitive.topology
+        );
         let dynamic_states = [
             vk::DynamicState::VIEWPORT,
             vk::DynamicState::SCISSOR,
@@ -2202,12 +2224,27 @@ impl crate::Device for super::Device {
 
         let mut raw_vec = {
             profiling::scope!("vkCreateGraphicsPipelines");
+            log::info!(
+                "POWERVR_DEBUG create_graphics_pipelines: stages={} vs_module={:?} fs_module={:?}",
+                stages.len(),
+                compiled_vs.as_ref().map(|c| c.create_info.module.as_raw()),
+                compiled_fs.as_ref().map(|c| c.create_info.module.as_raw())
+            );
             unsafe {
-                self.shared
+                match self.shared
                     .raw
                     .create_graphics_pipelines(pipeline_cache, &vk_infos, None)
-                    .map_err(|(_, e)| super::map_pipeline_err(e))
-            }?
+                {
+                    Ok(r) => {
+                        log::info!("POWERVR_DEBUG create_graphics_pipelines: SUCCESS");
+                        r
+                    }
+                    Err((_, e)) => {
+                        log::error!("POWERVR_DEBUG create_graphics_pipelines: FAILED {:?}", e);
+                        return Err(super::map_pipeline_err(e));
+                    }
+                }
+            }
         };
 
         let raw = raw_vec.pop().unwrap();
