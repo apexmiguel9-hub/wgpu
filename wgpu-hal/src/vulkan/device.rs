@@ -695,7 +695,7 @@ impl super::Device {
             );
         }
         // Dump full SPIR-V in chunks for large shaders (fragment shader is ~3686 words,
-        # compute shaders are 490-1345 words). Using 32-word chunks to avoid saturating logcat.
+        // compute shaders are 490-1345 words). Using 32-word chunks to avoid saturating logcat.
         if dump_spirv && spv.len() > 2000 {
             let label_str = label.map(|l| l.to_owned()).unwrap_or_else(|| "none".to_owned());
             let safe_label = label_str.replace('/', "_").replace(' ', "_");
