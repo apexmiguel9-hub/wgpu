@@ -694,11 +694,12 @@ impl super::Device {
                 spv[0], spv[1], spv[2], spv[3], spv[4], spv[5], spv[6], spv[7]
             );
         }
-        // Dump full SPIR-V in chunks for analysis
-        if dump_spirv {
+        // Dump full SPIR-V in chunks for large shaders (fragment shader is ~3686 words,
+        # compute shaders are 490-1345 words). Using 32-word chunks to avoid saturating logcat.
+        if dump_spirv && spv.len() > 2000 {
             let label_str = label.map(|l| l.to_owned()).unwrap_or_else(|| "none".to_owned());
             let safe_label = label_str.replace('/', "_").replace(' ', "_");
-            for chunk in spv.chunks(8) {
+            for chunk in spv.chunks(32) {
                 let words: Vec<String> = chunk.iter().map(|w| alloc::format!("{:08x}", w)).collect();
                 log::info!(
                     "POWERVR_DEBUG spv_chunk label={} offset={} {}",
