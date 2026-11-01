@@ -805,7 +805,7 @@ impl super::Device {
                     naga_stage,
                     stage.entry_point,
                     module.entry_points.len(),
-                    module.global_variables.keys().len(),
+                    module.global_variables.len(),
                     runtime_checks.bounds_checks,
                     runtime_checks.force_loop_bounding,
                     stage.zero_initialize_workgroup_memory
