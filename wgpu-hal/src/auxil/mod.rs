@@ -58,6 +58,11 @@ pub mod db {
         /// cbindgen:ignore
         pub const VENDOR: u32 = 0x10002;
     }
+    pub mod imagination {
+        /// `VK_VENDOR_ID_IMAGINATION`
+        /// cbindgen:ignore
+        pub const VENDOR: u32 = 0x1010;
+    }
 }
 
 /// Maximum binding size for the shaders that only support `i32` indexing.

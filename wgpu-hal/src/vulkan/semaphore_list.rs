@@ -74,11 +74,18 @@ impl SemaphoreList {
     ///   list's values, and add it to `submit_info`s extension chain.
     ///
     /// Return the revised `submit_info` value.
+    ///
+    /// If `powervr_workaround` is true, semaphore values are always padded for every
+    /// semaphore in the list when any timeline semaphore is present. This works around
+    /// Imagination (PowerVR) proprietary drivers that read `pWaitSemaphoreValues[i]`
+    /// for every wait semaphore without checking `waitSemaphoreValueCount` when
+    /// `VkTimelineSemaphoreSubmitInfo` is chained, causing a segfault when count is 0.
     pub fn add_to_submit<'info, 'semaphores: 'info>(
         wait_semaphores: &'semaphores mut Self,
         signal_semaphores: &'semaphores mut Self,
         submit_info: vk::SubmitInfo<'info>,
         timeline_info: &'info mut MaybeUninit<vk::TimelineSemaphoreSubmitInfo<'info>>,
+        powervr_workaround: bool,
     ) -> vk::SubmitInfo<'info> {
         wait_semaphores.check();
         signal_semaphores.check();
@@ -98,6 +105,20 @@ impl SemaphoreList {
         if !signal_semaphores.values.is_empty() {
             *timeline_info = timeline_info.signal_semaphore_values(&signal_semaphores.values);
             uses_timeline = true;
+        }
+
+        // PowerVR workaround: pad dummy values for binary semaphores when any timeline
+        // semaphore is present, so the driver has a valid value to read for every
+        // semaphore in the list.
+        if powervr_workaround && uses_timeline {
+            if !wait_semaphores.values.is_empty() && wait_semaphores.values.len() < wait_semaphores.semaphores.len() {
+                wait_semaphores.values.resize(wait_semaphores.semaphores.len(), !0);
+                *timeline_info = timeline_info.wait_semaphore_values(&wait_semaphores.values);
+            }
+            if !signal_semaphores.values.is_empty() && signal_semaphores.values.len() < signal_semaphores.semaphores.len() {
+                signal_semaphores.values.resize(signal_semaphores.semaphores.len(), !0);
+                *timeline_info = timeline_info.signal_semaphore_values(&signal_semaphores.values);
+            }
         }
 
         let mut submit_info = submit_info

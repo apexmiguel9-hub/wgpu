@@ -2369,6 +2369,10 @@ impl super::Instance {
                 super::Workarounds::FORCE_FILL_BUFFER_WITH_SIZE_GREATER_4096_ALIGNED_OFFSET_16,
                 phd_capabilities.properties.vendor_id == db::nvidia::VENDOR,
             );
+            workarounds.set(
+                super::Workarounds::POWERVR_TIMELINE_SEMAPHORE_PADDING,
+                phd_capabilities.properties.vendor_id == db::imagination::VENDOR,
+            );
         };
 
         if let Some(driver) = phd_capabilities.driver {
