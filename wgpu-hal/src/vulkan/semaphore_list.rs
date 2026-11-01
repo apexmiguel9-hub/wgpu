@@ -93,35 +93,34 @@ impl SemaphoreList {
         assert!(matches!(wait_semaphores.mode, SemaphoreListMode::Wait));
         assert!(matches!(signal_semaphores.mode, SemaphoreListMode::Signal));
 
-        let mut wait_values: Option<&[u64]> = None;
-        let mut signal_values: Option<&[u64]> = None;
-
-        let mut uses_timeline = false;
-
-        if !wait_semaphores.values.is_empty() {
-            wait_values = Some(&wait_semaphores.values);
-            uses_timeline = true;
-        }
-
-        if !signal_semaphores.values.is_empty() {
-            signal_values = Some(&signal_semaphores.values);
-            uses_timeline = true;
-        }
-
         // PowerVR workaround: pad dummy values for binary semaphores when any timeline
         // semaphore is present, so the driver has a valid value to read for every
         // semaphore in the list. Imagination PowerVR drivers read pWaitSemaphoreValues[i]
         // for every wait semaphore without checking waitSemaphoreValueCount when
         // VkTimelineSemaphoreSubmitInfo is chained, causing a segfault when count is 0.
+        let mut uses_timeline = false;
+        if !wait_semaphores.values.is_empty() {
+            uses_timeline = true;
+        }
+        if !signal_semaphores.values.is_empty() {
+            uses_timeline = true;
+        }
         if powervr_workaround && uses_timeline {
-            if wait_values.is_none() && !wait_semaphores.semaphores.is_empty() {
+            if wait_semaphores.values.is_empty() && !wait_semaphores.semaphores.is_empty() {
                 wait_semaphores.values.resize(wait_semaphores.semaphores.len(), !0);
-                wait_values = Some(&wait_semaphores.values);
             }
-            if signal_values.is_none() && !signal_semaphores.semaphores.is_empty() {
+            if signal_semaphores.values.is_empty() && !signal_semaphores.semaphores.is_empty() {
                 signal_semaphores.values.resize(signal_semaphores.semaphores.len(), !0);
-                signal_values = Some(&signal_semaphores.values);
             }
+        }
+
+        let mut wait_values: Option<&[u64]> = None;
+        let mut signal_values: Option<&[u64]> = None;
+        if !wait_semaphores.values.is_empty() {
+            wait_values = Some(&wait_semaphores.values);
+        }
+        if !signal_semaphores.values.is_empty() {
+            signal_values = Some(&signal_semaphores.values);
         }
 
         let timeline_info = timeline_info.write(vk::TimelineSemaphoreSubmitInfo::default());

@@ -1624,7 +1624,7 @@ impl crate::Queue for Queue {
         let mut vk_info = vk::SubmitInfo::default().command_buffers(&vk_cmd_buffers);
         let mut vk_timeline_info = mem::MaybeUninit::uninit();
         let powervr_workaround = self.device.workarounds.contains(
-            super::Workarounds::POWERVR_TIMELINE_SEMAPHORE_PADDING,
+            crate::vulkan::Workarounds::POWERVR_TIMELINE_SEMAPHORE_PADDING,
         );
         vk_info = SemaphoreList::add_to_submit(
             &mut wait_semaphores,
