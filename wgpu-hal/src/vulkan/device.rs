@@ -1,4 +1,11 @@
-use alloc::{borrow::ToOwned as _, collections::BTreeMap, ffi::CString, sync::Arc, vec::Vec};
+use alloc::{
+    borrow::ToOwned as _,
+    collections::BTreeMap,
+    ffi::CString,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use core::{
     ffi::CStr,
     mem::{self, MaybeUninit},
@@ -687,12 +694,12 @@ impl super::Device {
                 spv[0], spv[1], spv[2], spv[3], spv[4], spv[5], spv[6], spv[7]
             );
         }
-        // Dump full SPIR-V in chunks for analysis if env var is set
+        // Dump full SPIR-V in chunks for analysis
         if dump_spirv {
-            let label_str = label.map(|l| l.to_string()).unwrap_or_else(|| "none".to_string());
+            let label_str = label.map(|l| l.to_owned()).unwrap_or_else(|| "none".to_owned());
             let safe_label = label_str.replace('/', "_").replace(' ', "_");
             for chunk in spv.chunks(8) {
-                let words: Vec<String> = chunk.iter().map(|w| format!("{:08x}", w)).collect();
+                let words: Vec<String> = chunk.iter().map(|w| alloc::format!("{:08x}", w)).collect();
                 log::info!(
                     "POWERVR_DEBUG spv_chunk label={} offset={} {}",
                     safe_label,
@@ -2227,8 +2234,8 @@ impl crate::Device for super::Device {
             log::info!(
                 "POWERVR_DEBUG create_graphics_pipelines: stages={} vs_module={:?} fs_module={:?}",
                 stages.len(),
-                compiled_vs.as_ref().map(|c| c.create_info.module.as_raw()),
-                compiled_fs.as_ref().map(|c| c.create_info.module.as_raw())
+                compiled_vs.as_ref().map(|c| vk::Handle::as_raw(&c.create_info.module)),
+                compiled_fs.as_ref().map(|c| vk::Handle::as_raw(&c.create_info.module))
             );
             unsafe {
                 match self.shared
