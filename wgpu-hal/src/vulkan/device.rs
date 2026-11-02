@@ -679,13 +679,15 @@ impl super::Device {
         spv: &[u32],
         label: &crate::Label<'_>,
     ) -> Result<vk::ShaderModule, crate::DeviceError> {
-        let dump_spirv = true;
+        let variant = super::powervr_variant();
+        let dump_spirv = variant.is_empty() || variant == "dump";
         log::info!(
-            "POWERVR_DEBUG create_shader_module_impl: spv_words={} spv_bytes={} label={:?} dump={}",
+            "POWERVR_DEBUG create_shader_module_impl: spv_words={} spv_bytes={} label={:?} dump={} variant={}",
             spv.len(),
             spv.len() * 4,
             label,
-            dump_spirv
+            dump_spirv,
+            variant
         );
         // Log first 8 SPIR-V words (magic + version + generator + bounds) to identify the shader
         if spv.len() >= 8 {
@@ -704,7 +706,7 @@ impl super::Device {
                 log::info!(
                     "POWERVR_DEBUG spv_chunk label={} offset={} {}",
                     safe_label,
-                    (spv.as_ptr() as usize - chunk.as_ptr() as usize) / 4,
+                    (chunk.as_ptr() as usize - spv.as_ptr() as usize) / 4,
                     words.join(" ")
                 );
             }

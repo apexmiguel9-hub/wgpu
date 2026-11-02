@@ -2827,32 +2827,62 @@ impl super::Adapter {
                 // See <https://registry.khronos.org/vulkan/specs/latest/man/html/VkPhysicalDeviceShaderFloat16Int8Features.html#extension-features-shaderInt8>.
                 capabilities.extend(&[spv::Capability::Int8]);
             }
+            let powervr_variant = super::powervr_variant();
+            if !powervr_variant.is_empty() {
+                log::info!("POWERVR_VARIANT activa: {powervr_variant}");
+            }
+            if powervr_variant == "nodebug" {
+                flags.remove(spv::WriterFlags::DEBUG);
+            }
+            if powervr_variant == "nolabel" {
+                flags.remove(spv::WriterFlags::LABEL_VARYINGS);
+            }
+            if powervr_variant == "noforcepoint" {
+                flags.remove(spv::WriterFlags::FORCE_POINT_SIZE);
+            }
             spv::Options {
-                lang_version: match self.phd_capabilities.device_api_version {
-                    // Use maximum supported SPIR-V version according to
-                    // <https://github.com/KhronosGroup/Vulkan-Docs/blob/19b7651/appendices/spirvenv.adoc?plain=1#L21-L40>.
-                    vk::API_VERSION_1_0..vk::API_VERSION_1_1 => (1, 0),
-                    vk::API_VERSION_1_1..vk::API_VERSION_1_2 => (1, 3),
-                    vk::API_VERSION_1_2..vk::API_VERSION_1_3 => (1, 5),
-                    vk::API_VERSION_1_3.. => (1, 6),
-                    _ => unreachable!(),
+                lang_version: match powervr_variant {
+                    "spv10" => (1, 0),
+                    "spv11" => (1, 1),
+                    "spv12" => (1, 2),
+                    "spv13" => (1, 3),
+                    "spv14" => (1, 4),
+                    "spv15" => (1, 5),
+                    _ => match self.phd_capabilities.device_api_version {
+                        // Use maximum supported SPIR-V version according to
+                        // <https://github.com/KhronosGroup/Vulkan-Docs/blob/19b7651/appendices/spirvenv.adoc?plain=1#L21-L40>.
+                        vk::API_VERSION_1_0..vk::API_VERSION_1_1 => (1, 0),
+                        vk::API_VERSION_1_1..vk::API_VERSION_1_2 => (1, 3),
+                        vk::API_VERSION_1_2..vk::API_VERSION_1_3 => (1, 5),
+                        vk::API_VERSION_1_3.. => (1, 6),
+                        _ => unreachable!(),
+                    },
                 },
                 flags,
                 capabilities: Some(capabilities.iter().cloned().collect()),
-                bounds_check_policies: naga::proc::BoundsCheckPolicies {
-                    index: naga::proc::BoundsCheckPolicy::Restrict,
-                    buffer: if self.private_caps.robust_buffer_access2 {
-                        naga::proc::BoundsCheckPolicy::Unchecked
-                    } else {
-                        naga::proc::BoundsCheckPolicy::Restrict
-                    },
-                    image_load: if self.private_caps.robust_image_access {
-                        naga::proc::BoundsCheckPolicy::Unchecked
-                    } else {
-                        naga::proc::BoundsCheckPolicy::Restrict
-                    },
-                    // TODO: support bounds checks on binding arrays
-                    binding_array: naga::proc::BoundsCheckPolicy::Unchecked,
+                bounds_check_policies: if powervr_variant == "nobounds" {
+                    naga::proc::BoundsCheckPolicies {
+                        index: naga::proc::BoundsCheckPolicy::Unchecked,
+                        buffer: naga::proc::BoundsCheckPolicy::Unchecked,
+                        image_load: naga::proc::BoundsCheckPolicy::Unchecked,
+                        binding_array: naga::proc::BoundsCheckPolicy::Unchecked,
+                    }
+                } else {
+                    naga::proc::BoundsCheckPolicies {
+                        index: naga::proc::BoundsCheckPolicy::Restrict,
+                        buffer: if self.private_caps.robust_buffer_access2 {
+                            naga::proc::BoundsCheckPolicy::Unchecked
+                        } else {
+                            naga::proc::BoundsCheckPolicy::Restrict
+                        },
+                        image_load: if self.private_caps.robust_image_access {
+                            naga::proc::BoundsCheckPolicy::Unchecked
+                        } else {
+                            naga::proc::BoundsCheckPolicy::Restrict
+                        },
+                        // TODO: support bounds checks on binding arrays
+                        binding_array: naga::proc::BoundsCheckPolicy::Unchecked,
+                    }
                 },
                 zero_initialize_workgroup_memory: if self
                     .private_caps
@@ -2862,7 +2892,7 @@ impl super::Adapter {
                 } else {
                     spv::ZeroInitializeWorkgroupMemoryMode::Polyfill
                 },
-                force_loop_bounding: true,
+                force_loop_bounding: powervr_variant != "noloopbound",
                 ray_query_initialization_tracking: true,
                 use_storage_input_output_16: features.contains(wgt::Features::SHADER_F16)
                     && self.phd_features.supports_storage_input_output_16(),
@@ -2876,7 +2906,7 @@ impl super::Adapter {
                 }),
                 mesh_shader_primitive_indices_clamp: true,
                 trace_ray_argument_validation: true,
-                emit_int_div_checks: true,
+                emit_int_div_checks: powervr_variant != "nointdiv",
             }
         };
 

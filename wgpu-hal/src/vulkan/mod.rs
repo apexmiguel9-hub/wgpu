@@ -55,6 +55,23 @@ use crate::vulkan::semaphore_list::{SemaphoreListMode, SemaphoreType};
 
 const MAX_TOTAL_ATTACHMENTS: usize = crate::MAX_COLOR_ATTACHMENTS * 2 + 1;
 
+/// Variante de diagnóstico para el compilador Vulkan de PowerVR.
+///
+/// La app la publica en `POWERVR_VARIANT` antes de crear la instancia. Una cadena
+/// vacía significa comportamiento normal. Se lee con `getenv` porque `wgpu-hal` es
+/// `no_std` y no tiene acceso a `std::env`.
+pub(crate) fn powervr_variant() -> &'static str {
+    let name = b"POWERVR_VARIANT\0";
+    // SAFETY: `name` es una cadena C válida y `getenv` solo lee el entorno.
+    let value = unsafe { libc::getenv(name.as_ptr().cast()) };
+    if value.is_null() {
+        return "";
+    }
+    // SAFETY: `getenv` devuelve un puntero a una cadena C terminada en NUL que
+    // vive mientras viva el proceso.
+    unsafe { CStr::from_ptr(value) }.to_str().unwrap_or("")
+}
+
 #[derive(Clone, Debug)]
 pub struct Api;
 
