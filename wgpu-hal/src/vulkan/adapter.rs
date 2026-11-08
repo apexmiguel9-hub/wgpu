@@ -2773,7 +2773,14 @@ impl super::Adapter {
             let mut flags = spv::WriterFlags::empty();
             flags.set(
                 spv::WriterFlags::DEBUG,
-                self.instance.flags.contains(wgt::InstanceFlags::DEBUG),
+                self.instance.flags.contains(wgt::InstanceFlags::DEBUG)
+                    // Imagination PowerVR (vendor 0x1010): el driver aborta en
+                    // `vkCreateGraphicsPipelines` (`FragmentShaderCompileState::CompileUF` ->
+                    // `BILParseStream`) cuando el SPIR-V lleva debug info
+                    // (`OpSource`/`OpLine`/`OpName` embebidas por naga bajo DEBUG).
+                    // Medido en Moto G56 5G (BXM-8-256): sin DEBUG el pipeline de
+                    // egui compila OK con texturas reales y SPIR-V 1.6.
+                    && self.phd_capabilities.properties.vendor_id != 0x1010,
             );
             flags.set(
                 spv::WriterFlags::LABEL_VARYINGS,
